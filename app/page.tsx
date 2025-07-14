@@ -25,7 +25,7 @@ interface Routine {
   completed: boolean
 }
 
-// Sistema de persistencia
+// Sistema de persistencia mejorado
 const STORAGE_KEY = "training-routines"
 const BACKUP_KEY = "training-routines-backup"
 const VERSION_KEY = "training-data-version"
@@ -116,6 +116,9 @@ export default function TrainingLog() {
   const [currentView, setCurrentView] = useState<"dashboard" | "create" | "routine">("dashboard")
   const [selectedRoutine, setSelectedRoutine] = useState<Routine | null>(null)
   const [isDarkMode, setIsDarkMode] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [selectedWeekFilter, setSelectedWeekFilter] = useState<string>("all")
+  const ROUTINES_PER_PAGE = 5
 
   // Cargar datos del localStorage al iniciar
   useEffect(() => {
@@ -180,7 +183,57 @@ export default function TrainingLog() {
     }
   }
 
+  // Obtener todas las semanas únicas
+  const getAllWeeks = () => {
+    const weeks = [...new Set(routines.map((r) => r.week))].sort().reverse()
+    return weeks
+  }
+
+  // Filtrar rutinas por semana
+  const getFilteredRoutines = () => {
+    if (selectedWeekFilter === "all") {
+      return routines.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    }
+    return routines
+      .filter((r) => r.week === selectedWeekFilter)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }
+
+  // Paginación
+  const getPaginatedRoutines = () => {
+    const filtered = getFilteredRoutines()
+    const startIndex = (currentPage - 1) * ROUTINES_PER_PAGE
+    const endIndex = startIndex + ROUTINES_PER_PAGE
+    return {
+      routines: filtered.slice(startIndex, endIndex),
+      totalPages: Math.ceil(filtered.length / ROUTINES_PER_PAGE),
+      totalRoutines: filtered.length,
+    }
+  }
+
+  // Función para duplicar rutina
+  const duplicateRoutine = (routine: Routine) => {
+    const duplicatedRoutine = {
+      ...routine,
+      id: Date.now().toString(),
+      name: `${routine.name} (COPIA)`,
+      date: new Date().toISOString().split("T")[0],
+      week: getCurrentWeek(),
+      completed: false,
+      exercises: routine.exercises.map((ex) => ({
+        ...ex,
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        comments: ex.comments || "",
+      })),
+    }
+
+    setRoutines((prev) => [duplicatedRoutine, ...prev])
+    console.log("📋 Rutina duplicada exitosamente")
+  }
+
   const stats = getWeeklyStats()
+  const { routines: paginatedRoutines, totalPages, totalRoutines } = getPaginatedRoutines()
+  const allWeeks = getAllWeeks()
   const recentRoutines = routines.slice(-5).reverse()
 
   if (currentView === "create") {
@@ -273,7 +326,7 @@ export default function TrainingLog() {
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               }`}
             >
-              BITACORA DE ENTRENAMIENTO DE UN ATLETA
+              BITACORA DE ENTRENAMIENTO
             </p>
             <div className={`h-px w-16 ${isDarkMode ? "bg-white" : "bg-black"}`}></div>
           </div>
@@ -424,7 +477,61 @@ export default function TrainingLog() {
             </div>
           </div>
 
-          {recentRoutines.length === 0 ? (
+          {/* Filtros y Stats */}
+          <div className="mb-8 space-y-6">
+            {/* Filtro por semana */}
+            <div className="relative">
+              <div
+                className={`absolute inset-0 transform translate-x-2 translate-y-2 ${isDarkMode ? "bg-white" : "bg-black"}`}
+              ></div>
+              <div
+                className={`relative border-2 p-4 ${isDarkMode ? "bg-black border-white" : "bg-white border-black"}`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <Calendar className={`h-6 w-6 ${isDarkMode ? "text-white" : "text-black"}`} />
+                    <span className={`font-black uppercase tracking-wider ${isDarkMode ? "text-white" : "text-black"}`}>
+                      FILTRAR POR SEMANA:
+                    </span>
+                  </div>
+                  <select
+                    value={selectedWeekFilter}
+                    onChange={(e) => {
+                      setSelectedWeekFilter(e.target.value)
+                      setCurrentPage(1)
+                    }}
+                    className={`border-2 px-4 py-2 font-black uppercase tracking-wide ${
+                      isDarkMode
+                        ? "bg-black border-white text-white focus:border-gray-400"
+                        : "bg-white border-black text-black focus:border-gray-600"
+                    }`}
+                  >
+                    <option value="all">TODAS LAS SEMANAS</option>
+                    {allWeeks.map((week) => (
+                      <option key={week} value={week}>
+                        SEMANA {week}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Stats de filtrado */}
+            <div className="flex items-center justify-between">
+              <div className={`text-sm uppercase tracking-wide ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                MOSTRANDO {paginatedRoutines.length} DE {totalRoutines} RUTINAS
+                {selectedWeekFilter !== "all" && ` • SEMANA ${selectedWeekFilter}`}
+              </div>
+              {totalPages > 1 && (
+                <div className={`text-sm uppercase tracking-wide ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                  PÁGINA {currentPage} DE {totalPages}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {paginatedRoutines.length === 0 ? (
             <div className="text-center py-16 space-y-6">
               <div className="relative inline-block">
                 <Dumbbell className={`h-24 w-24 opacity-20 ${isDarkMode ? "text-white" : "text-black"}`} />
@@ -438,24 +545,19 @@ export default function TrainingLog() {
                 <p
                   className={`text-2xl font-bold uppercase tracking-wider ${isDarkMode ? "text-white" : "text-black"}`}
                 >
-                  SIN DATOS
+                  {selectedWeekFilter === "all" ? "SIN DATOS" : "SIN RUTINAS"}
                 </p>
                 <p className={`uppercase tracking-wide text-sm mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                  INICIA TU PRIMERA RUTINA
+                  {selectedWeekFilter === "all"
+                    ? "INICIA TU PRIMERA RUTINA"
+                    : `NO HAY RUTINAS EN LA SEMANA ${selectedWeekFilter}`}
                 </p>
               </div>
             </div>
           ) : (
             <div className="space-y-4">
-              {recentRoutines.map((routine, index) => (
-                <div
-                  key={routine.id}
-                  className="group relative cursor-pointer"
-                  onClick={() => {
-                    setSelectedRoutine(routine)
-                    setCurrentView("routine")
-                  }}
-                >
+              {paginatedRoutines.map((routine, index) => (
+                <div key={routine.id} className="group relative">
                   <div
                     className={`absolute inset-0 transform translate-x-2 translate-y-2 group-hover:translate-x-1 group-hover:translate-y-1 transition-transform duration-200 ${
                       isDarkMode ? "bg-white" : "bg-black"
@@ -467,10 +569,16 @@ export default function TrainingLog() {
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex-1">
+                      <div
+                        className="flex-1 cursor-pointer"
+                        onClick={() => {
+                          setSelectedRoutine(routine)
+                          setCurrentView("routine")
+                        }}
+                      >
                         <div className="flex items-center gap-4 mb-2">
                           <div className={`text-4xl font-black ${isDarkMode ? "text-white" : "text-black"}`}>
-                            {String(index + 1).padStart(2, "0")}
+                            {String((currentPage - 1) * ROUTINES_PER_PAGE + index + 1).padStart(2, "0")}
                           </div>
                           <div>
                             <h4
@@ -518,23 +626,116 @@ export default function TrainingLog() {
                         </div>
                       </div>
 
-                      <div className="text-right">
-                        <div
-                          className={`w-12 h-12 border-2 flex items-center justify-center transform rotate-45 group-hover:rotate-90 transition-transform duration-300 ${
-                            isDarkMode ? "border-white" : "bg-black"
-                          }`}
-                        >
-                          <TrendingUp
-                            className={`h-6 w-6 transform -rotate-45 group-hover:-rotate-90 transition-transform duration-300 ${
-                              isDarkMode ? "text-white" : "text-black"
+                      <div className="flex items-center gap-3">
+                        {/* Botón Duplicar */}
+                        <div className="relative group/duplicate">
+                          <div
+                            className={`absolute inset-0 transform rotate-45 group-hover/duplicate:rotate-90 transition-transform duration-300 ${isDarkMode ? "bg-white" : "bg-black"}`}
+                          ></div>
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              duplicateRoutine(routine)
+                            }}
+                            className={`relative border-2 p-3 transform -rotate-45 group-hover/duplicate:rotate-0 transition-all duration-300 ${
+                              isDarkMode
+                                ? "bg-black text-white border-white hover:bg-white hover:text-black"
+                                : "bg-white text-black border-black hover:bg-black hover:text-white"
                             }`}
-                          />
+                            title="Duplicar rutina"
+                          >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                              />
+                            </svg>
+                          </Button>
+                        </div>
+
+                        {/* Botón Ver */}
+                        <div className="text-right">
+                          <div
+                            className={`w-12 h-12 border-2 flex items-center justify-center transform rotate-45 group-hover:rotate-90 transition-transform duration-300 cursor-pointer ${
+                              isDarkMode ? "border-white" : "border-black"
+                            }`}
+                            onClick={() => {
+                              setSelectedRoutine(routine)
+                              setCurrentView("routine")
+                            }}
+                          >
+                            <TrendingUp
+                              className={`h-6 w-6 transform -rotate-45 group-hover:-rotate-90 transition-transform duration-300 ${
+                                isDarkMode ? "text-white" : "text-black"
+                              }`}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Paginación */}
+          {totalPages > 1 && (
+            <div className="mt-8 flex justify-center">
+              <div className="relative">
+                <div
+                  className={`absolute inset-0 transform translate-x-2 translate-y-2 ${isDarkMode ? "bg-white" : "bg-black"}`}
+                ></div>
+                <div
+                  className={`relative border-2 p-4 flex items-center gap-4 ${isDarkMode ? "bg-black border-white" : "bg-white border-black"}`}
+                >
+                  <Button
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className={`border-2 px-4 py-2 font-black uppercase tracking-wide disabled:opacity-50 ${
+                      isDarkMode
+                        ? "bg-black text-white border-white hover:bg-white hover:text-black"
+                        : "bg-white text-black border-black hover:bg-black hover:text-white"
+                    }`}
+                  >
+                    ← ANTERIOR
+                  </Button>
+
+                  <div className="flex items-center gap-2">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-10 h-10 border-2 font-black ${
+                          page === currentPage
+                            ? isDarkMode
+                              ? "bg-white text-black border-white"
+                              : "bg-black text-white border-black"
+                            : isDarkMode
+                              ? "bg-black text-white border-white hover:bg-white hover:text-black"
+                              : "bg-white text-black border-black hover:bg-black hover:text-white"
+                        }`}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <Button
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className={`border-2 px-4 py-2 font-black uppercase tracking-wide disabled:opacity-50 ${
+                      isDarkMode
+                        ? "bg-black text-white border-white hover:bg-white hover:text-black"
+                        : "bg-white text-black border-black hover:bg-black hover:text-white"
+                    }`}
+                  >
+                    SIGUIENTE →
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
         </div>
