@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Calendar, CheckCircle, Edit3, Save, X, TrendingUp, Target, Zap } from "lucide-react"
+import { ArrowLeft, Calendar, CheckCircle, Edit3, Save, X, TrendingUp, Target, Zap, Copy } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface Exercise {
@@ -65,6 +65,14 @@ export function WeeklyRoutine({ routine, onUpdate, onBack, allRoutines, isDarkMo
   const cancelEditing = () => {
     setEditingExercise(null)
     setEditedExercise(null)
+  }
+
+  // Copiar rutina al portapapeles sin rpe, rir ni comentarios
+  const copiarRutina = () => {
+    const texto = routine.exercises
+      .map((ex, idx) => `${idx + 1}. ${ex.name}: ${ex.sets} sets x ${ex.reps} reps`)
+      .join("\n")
+    navigator.clipboard.writeText(texto)
   }
 
   // Obtener rutinas de la misma semana para comparar
@@ -184,6 +192,17 @@ export function WeeklyRoutine({ routine, onUpdate, onBack, allRoutines, isDarkMo
             </div>
 
             <TabsContent value="routine" className="space-y-8">
+              {/* Botón para copiar rutina */}
+              <div className="flex justify-end mb-4">
+                <Button
+                  variant="outline"
+                  onClick={copiarRutina}
+                  className={`gap-2 border-2 font-bold uppercase tracking-wider ${isDarkMode ? 'bg-black text-white border-white hover:bg-white hover:text-black' : 'bg-white text-black border-black hover:bg-black hover:text-white'}`}
+                >
+                  <Copy className="h-4 w-4" />
+                  Copiar rutina
+                </Button>
+              </div>
               {/* Exercise List */}
               <div className="relative">
                 <div className="absolute inset-0 bg-white transform translate-x-4 translate-y-4"></div>

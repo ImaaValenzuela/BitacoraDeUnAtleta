@@ -221,9 +221,11 @@ export default function TrainingLog() {
       week: getCurrentWeek(),
       completed: false,
       exercises: routine.exercises.map((ex) => ({
-        ...ex,
         id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-        comments: ex.comments || "",
+        name: ex.name,
+        sets: ex.sets,
+        reps: ex.reps,
+        // No copiar rpe, rir ni comments
       })),
     }
 
